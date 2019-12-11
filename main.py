@@ -3,7 +3,7 @@ from time import time
 
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from PyQt5.QtWidgets import QApplication, QWidget, QFileDialog, QPushButton, QTextEdit, QLabel, QGridLayout
+from PyQt5.QtWidgets import QApplication, QWidget, QFileDialog, QPushButton, QLineEdit, QTextEdit, QLabel, QGridLayout
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
@@ -23,8 +23,8 @@ def get_needed_mark(mark):
 class ExcelMarksInterface(QWidget):
     def __init__(self):
         super().__init__()
-        self.needed_file_description, self.select_file_button, self.selected_file_label,\
-            self.start_analysing_button, self.output_console = [None] * 5
+        self.needed_file_description, self.select_file_button, self.selected_file_label, self.form_data_description,\
+            self.form_input, self.start_analysing_button, self.output_console = [None] * 7
         self.init_ui()
         self.analyser = ExcelMarksAnalyser()
         self.filename = None
@@ -34,34 +34,55 @@ class ExcelMarksInterface(QWidget):
         self.setFixedSize(800, 600)
         self.setWindowTitle('Обработка оценок учеников')
 
+        grid = QGridLayout()
+        grid.setContentsMargins(40, 20, 40, 30)
+        grid.setSpacing(20)
+        self.setLayout(grid)
+
+        self.needed_file_description = QLabel('Выберите файл с итоговыми оценками:', self)
+        self.needed_file_description.setAlignment(Qt.AlignCenter)
+        self.needed_file_description.setFont(QFont('Arial', 13))
+        grid.addWidget(self.needed_file_description, 0, 0, 1, 3)
+
         self.select_file_button = QPushButton('Выбрать файл', self)
         self.select_file_button.setFont(QFont('Arial', 12))
-        self.select_file_button.resize(200, 50)
-        self.select_file_button.move(300, 50)
         self.select_file_button.clicked.connect(self.select_file)
+        self.select_file_button.setFixedSize(150, 40)
+        grid.addWidget(self.select_file_button, 1, 0, alignment=Qt.AlignCenter)
 
-        self.selected_file_label = QLabel('Файл не выбран', self)
-        self.selected_file_label.setAlignment(Qt.AlignCenter)
+        self.selected_file_label = QLabel('Файл не выбран.', self)
         self.selected_file_label.setFont(QFont('Arial', 12))
-        self.selected_file_label.resize(600, 50)
-        self.selected_file_label.move(100, 100)
+        grid.addWidget(self.selected_file_label, 1, 1, 1, 2)
+
+        self.form_data_description = QLabel('Введите полное название класса (разделяя номер и букву дефисом):', self)
+        self.form_data_description.setAlignment(Qt.AlignCenter)
+        self.form_data_description.setFont(QFont('Arial', 13))
+        grid.addWidget(self.form_data_description, 2, 0, 1, 2)
+
+        self.form_input = QLineEdit('', self)
+        self.form_input.setAlignment(Qt.AlignCenter)
+        self.form_input.setFont(QFont('Arial', 14))
+        self.form_input.setMaximumWidth(200)
+        self.form_input.setMinimumHeight(30)
+        grid.addWidget(self.form_input, 2, 2, alignment=Qt.AlignCenter)
 
         self.start_analysing_button = QPushButton('Начать', self)
-        self.start_analysing_button.setFont(QFont('Arial', 12))
-        self.start_analysing_button.resize(200, 50)
-        self.start_analysing_button.move(300, 150)
+        self.start_analysing_button.setFont(QFont('Arial', 13))
         self.start_analysing_button.clicked.connect(self.analyse)
+        self.start_analysing_button.setAutoDefault(True)
+        self.start_analysing_button.setFixedSize(200, 50)
+        grid.addWidget(self.start_analysing_button, 4, 0, 1, 3, alignment=Qt.AlignCenter)
 
         self.output_console = QTextEdit('', self)
-        self.output_console.setFont(QFont('Arial', 10))
-        self.output_console.resize(600, 300)
-        self.output_console.move(100, 250)
+        self.output_console.setFont(QFont('Arial', 12))
         self.output_console.setReadOnly(True)
+        self.output_console.setMaximumHeight(300)
+        grid.addWidget(self.output_console, 5, 0, 1, 3)
 
     def select_file(self):  # метод для отображения окна открытия файла
         filename = QFileDialog.getOpenFileName(self, 'Выбор файла для обработки')[0]
         if filename == '':
-            self.selected_file_label.setText('Файл не выбран')
+            self.selected_file_label.setText('Файл не выбран.')
         else:
             self.filename = filename
             self.selected_file_label.setText('Выбранный файл: {}'.format(filename.split('/')[-1]))
