@@ -57,14 +57,14 @@ class ExcelMarksInterface(QWidget):
         self.form_data_description = QLabel('Введите полное название класса (разделяя номер и букву дефисом):', self)
         self.form_data_description.setAlignment(Qt.AlignCenter)
         self.form_data_description.setFont(QFont('Arial', 13))
+        self.form_data_description.setFixedWidth(570)
         grid.addWidget(self.form_data_description, 2, 0, 1, 2)
 
         self.form_input = QLineEdit('', self)
         self.form_input.setAlignment(Qt.AlignCenter)
         self.form_input.setFont(QFont('Arial', 14))
-        self.form_input.setMaximumWidth(200)
-        self.form_input.setMinimumHeight(30)
-        grid.addWidget(self.form_input, 2, 2, alignment=Qt.AlignCenter)
+        self.form_input.setMaximumWidth(150)
+        grid.addWidget(self.form_input, 2, 2, alignment=Qt.AlignRight)
 
         self.start_analysing_button = QPushButton('Начать', self)
         self.start_analysing_button.setFont(QFont('Arial', 13))
@@ -79,32 +79,40 @@ class ExcelMarksInterface(QWidget):
         self.output_console.setMaximumHeight(300)
         grid.addWidget(self.output_console, 5, 0, 1, 3)
 
-    def select_file(self):  # метод для отображения окна открытия файла
+    def select_file(self):  # метод для отображения окна выбора файла
         filename = QFileDialog.getOpenFileName(self, 'Выбор файла для обработки')[0]
         if filename == '':
             self.selected_file_label.setText('Файл не выбран.')
         else:
             self.filename = filename
-            self.selected_file_label.setText('Выбранный файл: {}'.format(filename.split('/')[-1]))
+            self.selected_file_label.setText('Выбранный файл: "{}".'.format(filename.split('/')[-1]))
 
     def analyse(self):  # метод для обработки файла
-        if self.filename in (None, ''):  # проверка на что, файл не выбран
+        if self.filename in (None, ''):  # проверка на то, что файл не выбран
             self.output_console.append('Ошибка: Файл не выбран.\n')
             return
         if not self.filename.endswith('.xlsx'):  # проверка на расширение файла
-            self.output_console.append('Ошибка: Неподдерживаемый тип файла: "{}".\n'.
+            self.output_console.append('Ошибка: Неподдерживаемое расширение файла: "{}".\n'.
                                        format(self.filename.split('.')[-1]))
+            return
+
+        form = self.form_input.text()
+        if form == '':  # проверка на то, что класс не указан
+            self.output_console.append('Ошибка: Класс не указан.\n')
+            return
+        if '-' not in form:  # проверка на отсутствие дефиса в названии класса
+            self.output_console.append('Ошибка: Неправильный формат названия класса.\n')
             return
 
         try:
             start_time = time()
 
-            new_filename = 'result_{}'.format(self.filename.split('/')[-1])
+            new_filename = 'result_{}'.format(form)
 
-            self.analyser.analyse_file(self.filename)
+            self.analyser.analyse_file(self.filename, form)
             self.analyser.create_resulting_file(new_filename)
 
-            self.output_console.append('Успешно обработано: "{}".'.format(self.filename))
+            self.output_console.append('Успешно обработано: "{}" ({}).'.format(self.filename, form))
             self.output_console.append('Файл "{}" успешно создан.'.format(new_filename))
             self.output_console.append('Длительность выполнения: {} сек.\n'.format(str(round(time() - start_time, 2))))
 
@@ -180,7 +188,7 @@ class ExcelMarksAnalyser:
 
                 index += 50
 
-    def analyse_file(self, filename):  # метод для обработки данных файлов
+    def analyse_file(self, filename, form):  # метод для обработки данных файлов
         self.filename = filename
         if len(filename.split('/')) > 1:
             path = '/'.join(filename.split('/')[:-1]) + '/'
