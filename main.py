@@ -123,6 +123,7 @@ class ExcelMarksInterface(QWidget):
 
             self.analyser.analyse_file(self.filename, form)
             self.analyser.create_resulting_file(new_filename)
+            self.analyser.reset()
 
             self.output_console.append('Успешно обработано: "{}" ({}).'.format(self.filename, form))
             self.output_console.append('Файл "{}" успешно создан.'.format(new_filename))
@@ -139,6 +140,10 @@ class ExcelMarksAnalyser:
         self.THIN = Side(border_style='thin', color='000000')
         self.THICK = Side(border_style='thick', color='000000')
         self.DOUBLE = Side(border_style='double', color='000000')
+
+    def reset(self):
+        self.all_subjects = None
+        self.students = {}
 
     def get_average_marks(self, path, filenames):  # метод для получения средних баллов из первого файла
         for file_num in range(len(filenames)):  # пробегаемся по файлам за каждый триместр
@@ -171,17 +176,13 @@ class ExcelMarksAnalyser:
                 row_num += 1
 
     def get_final_marks(self, filename, form):  # метод для получения триместровых оценок
-        workbook = load_workbook(filename, read_only=True)
+        workbook = load_workbook(filename, read_only=False)
 
         form_num = form.split('-')[0]
         sheet = workbook[form_num]
 
-        index = 3
-        while sheet.cell(row=index, column=2).value != form:  # находим индекс данных о нужном нам классе
-            if index > sheet.max_row:
-                raise ValueError('Данные о выбранном классе не найдены')
-
-            index += 1
+        data = list(map(lambda el: el.value, sheet['B']))
+        index = data.index(form) + 1
 
         subj_index = index + 2
         col = 2
