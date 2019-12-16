@@ -1,4 +1,5 @@
 import sys
+import os
 from time import time
 
 from openpyxl import load_workbook, Workbook
@@ -96,7 +97,7 @@ class ExcelMarksInterface(QWidget):
                                        format(self.filename.split('.')[-1]))
             return
 
-        form = self.form_input.text()
+        form = self.form_input.text().upper()
         if form == '':  # проверка на то, что класс не указан
             self.output_console.append('Ошибка: Класс не указан.\n')
             return
@@ -107,7 +108,7 @@ class ExcelMarksInterface(QWidget):
         try:
             start_time = time()
 
-            new_filename = 'result_{}'.format(form)
+            new_filename = 'Заключение по итоговым оценкам_{}.xlsx'.format(form)
 
             self.analyser.analyse_file(self.filename, form)
             self.analyser.create_resulting_file(new_filename)
@@ -122,7 +123,6 @@ class ExcelMarksInterface(QWidget):
 
 class ExcelMarksAnalyser:
     def __init__(self):
-        self.filename = None
         self.students = {}
         self.THIN = Side(border_style='thin', color='000000')
         self.THICK = Side(border_style='thick', color='000000')
@@ -157,50 +157,77 @@ class ExcelMarksAnalyser:
 
                 row_num += 1
 
-    def get_final_marks(self):  # метод для получения треместровых оценок
-        workbook = load_workbook(self.filename, read_only=True)
+    def get_final_marks(self, filename, form):  # метод для получения триместровых оценок
+        workbook = load_workbook(filename, read_only=True)
 
-        for sheet in workbook:  # пробегаемся по всем листам
+        form_num = form.split('-')[0]
+        sheet = workbook[form_num]
 
-            # получаем название предмета на данном листе
-            subject = sheet['U41'].value.split(', ')[1]
+        index = 3
+        while sheet.cell(row=index, column=2).value != form:  # находим индекс данных о нужном нам классе
+            if index > sheet.max_row:
+                raise ValueError('Данные о выбранном классе не найдены')
 
-            index = 1
-            while sheet.cell(row=index, column=1).value:  # пробегаемся по всем таблицам
+            index += 1
 
-                # пробегаемся по всем строкам в этой таблице
-                for row_num in range(index + 2, index + 50):
+        subj_index = index + 2
+        col = 2
+        subjects, periods = {}, {}
+        while sheet.cell(row=subj_index + 1, column=col).value not in (None, ''):  # анализируем шапку
+            subject = sheet.cell(row=subj_index, column=col).value
+            if subject not in (None, ''):
+                subjects[col] = subject
+            else:
+                subjects[col] = subjects[col - 1]
 
-                    row = sheet[row_num][1:19]
-                    student = ' '.join(row[0].value.split()[:2])  # получаем имя ученика
-                    if not student:
-                        break
+            period = sheet.cell(row=subj_index + 1, column=col).value
+            if period not in (None, ''):
+                periods[col] = period
 
-                    for cell in row[1:]:  # пробегаемся по всем оценкам данного ученика в этой таблице
-                        mark = cell.value
-                        if mark:
-                            if mark.isdigit() and cell.font.name == 'Arial Black':  # проверяем, триместровая ли оценка
-                                for trimester in range(3):
-                                    if self.students[student][subject][trimester][1] is None:
-                                        if self.students[student][subject][trimester][0]:
-                                            self.students[student][subject][trimester][1] = int(mark)
-                                            break
+            col += 1
 
-                index += 50
+        max_col = col
 
-    def analyse_file(self, filename, form):  # метод для обработки данных файлов
-        self.filename = filename
+        student_index = subj_index + 2
+        student_name = sheet.cell(row=student_index, column=1).value
+        while student_name not in (None, ''):  # пробегаемся по всем ученикам нужного класса
+            short_name = ' '.join(student_name.split()[:2])
+
+            for col in range(2, max_col):  # пробегаемся по всем оценкам данного ученика
+                mark = sheet.cell(row=student_index, column=col).value
+                if mark in (None, ''):
+                    continue
+
+                subject = subjects[col]
+                if periods[col] == '1 триместр':  # если это итоговая 1 триместра
+                    self.students[short_name][subject][0][1] = int(mark)
+                elif periods[col] == '2 триместр':  # если это итоговая 2 триместра
+                    self.students[short_name][subject][1][1] = int(mark)
+                elif periods[col] == '3 триместр':  # если это итоговая 3 триместра
+                    self.students[short_name][subject][2][1] = int(mark)
+
+            student_index += 1
+            student_name = sheet.cell(row=student_index, column=1).value
+
+    def analyse_file(self, filename, form):  # основной метод для обработки данных файлов
         if len(filename.split('/')) > 1:
             path = '/'.join(filename.split('/')[:-1]) + '/'
         else:
             path = ''
 
-        filenames = ['Отчёт по средним баллам 7-А класс. Iтр.xlsx',
-                     'Отчёт по средним баллам 7-А класс. IIтр.xlsx',
-                     'Отчёт по средним баллам 7-А класс. IIIтр.xlsx']
+        filenames = []
+        for file in os.listdir(path):
+            if form in file and '.xlsx' in file:
+                if 'I' not in file:
+                    filenames.append(file)
+                    break
+                filenames.append(file)
+        filenames.sort(key=lambda el: el.count('I'))
+        if len(filenames) == 0:
+            raise ValueError('Файл со средними оценками не найден')
 
         self.get_average_marks(path, filenames)
-        self.get_final_marks()
+        self.get_final_marks(filename, form)
 
     def create_resulting_file(self, filename):  # метод для создания результирующего файла
         workbook = Workbook()
