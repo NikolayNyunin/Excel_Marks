@@ -9,16 +9,27 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 
+def is_number(mark):
+    if (''.join(mark.split('.'))).isalnum():
+        return True
+    return False
+
+
 def get_needed_mark(mark):
+    if not is_number(mark):
+        return mark
+    else:
+        mark = float(mark)
+
     if mark == 0:
-        return 0
+        return '0'
     elif mark < 2.5:
-        return 2
+        return '2'
     elif mark < 3.5:
-        return 3
+        return '3'
     elif mark < 4.5:
-        return 4
-    return 5
+        return '4'
+    return '5'
 
 
 class ExcelMarksInterface(QWidget):
@@ -147,7 +158,7 @@ class ExcelMarksAnalyser:
                     self.students[student] = {}
 
                 for mark_index in range(len(row[1:])):  # пробегаемся по всем оценкам данного ученика
-                    mark = float(row[1:][mark_index])
+                    mark = row[1:][mark_index]
                     subject = subjects[mark_index]
 
                     if subject not in self.students[student].keys():
@@ -193,18 +204,24 @@ class ExcelMarksAnalyser:
         while student_name not in (None, ''):  # пробегаемся по всем ученикам нужного класса
             short_name = ' '.join(student_name.split()[:2])
 
+            if short_name not in self.students.keys():
+                self.students[short_name] = {}
+
             for col in range(2, max_col):  # пробегаемся по всем оценкам данного ученика
                 mark = sheet.cell(row=student_index, column=col).value
                 if mark in (None, ''):
                     continue
 
                 subject = subjects[col]
+                if subject not in self.students[short_name].keys():
+                    self.students[short_name][subject] = [[None] * 2, [None] * 2, [None] * 2]
+
                 if periods[col] == '1 триместр':  # если это итоговая 1 триместра
-                    self.students[short_name][subject][0][1] = int(mark)
+                    self.students[short_name][subject][0][1] = mark
                 elif periods[col] == '2 триместр':  # если это итоговая 2 триместра
-                    self.students[short_name][subject][1][1] = int(mark)
+                    self.students[short_name][subject][1][1] = mark
                 elif periods[col] == '3 триместр':  # если это итоговая 3 триместра
-                    self.students[short_name][subject][2][1] = int(mark)
+                    self.students[short_name][subject][2][1] = mark
 
             student_index += 1
             student_name = sheet.cell(row=student_index, column=1).value
@@ -304,7 +321,7 @@ class ExcelMarksAnalyser:
                                                                                  top=self.THIN, right=self.DOUBLE)
                             sheet.cell(row=3, column=column + 2).border = Border(bottom=self.THIN, right=self.DOUBLE)
 
-                    marks = [0 if mark is None else mark for mark in self.students[student][subject][trimester]]
+                    marks = ['0' if mark is None else mark for mark in self.students[student][subject][trimester]]
 
                     sheet.cell(row=student_index + 4, column=column).value = marks[0]
                     sheet.cell(row=student_index + 4, column=column + 2).value = marks[1]
