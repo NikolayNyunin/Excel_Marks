@@ -134,6 +134,7 @@ class ExcelMarksInterface(QWidget):
 
 class ExcelMarksAnalyser:
     def __init__(self):
+        self.all_subjects = None
         self.students = {}
         self.THIN = Side(border_style='thin', color='000000')
         self.THICK = Side(border_style='thick', color='000000')
@@ -145,6 +146,7 @@ class ExcelMarksAnalyser:
             sheet = workbook.active
 
             subjects = list(map(lambda s: s.value, sheet[6][1:]))
+            self.all_subjects = subjects.copy()
 
             row_num = 7
             while True:  # пробегаемся по всем рядам таблицы с учениками
@@ -188,6 +190,9 @@ class ExcelMarksAnalyser:
             subject = sheet.cell(row=subj_index, column=col).value
             if subject not in (None, ''):
                 subjects[col] = subject
+
+                if subject not in self.all_subjects:
+                    self.all_subjects.append(subject)
             else:
                 subjects[col] = subjects[col - 1]
 
@@ -278,8 +283,7 @@ class ExcelMarksAnalyser:
                 sheet.cell(row=student_index + 4, column=2, value=student).border = Border(right=self.THICK)
 
             subject_index = 0
-            for subject in self.students[student].keys():  # пробегаемся по всем предметам
-                # возможно, стоит добавить сортировку
+            for subject in sorted(self.all_subjects):  # пробегаемся по всем предметам
 
                 subject_column = 3 + subject_index * 9
                 if student_index == 0:  # если это список предметов первого ученика, заполняем шапку
@@ -321,7 +325,10 @@ class ExcelMarksAnalyser:
                                                                                  top=self.THIN, right=self.DOUBLE)
                             sheet.cell(row=3, column=column + 2).border = Border(bottom=self.THIN, right=self.DOUBLE)
 
-                    marks = ['0' if mark is None else mark for mark in self.students[student][subject][trimester]]
+                    if subject in self.students[student].keys():  # если предмета нет в списке предметов ученика
+                        marks = ['0' if mark is None else mark for mark in self.students[student][subject][trimester]]
+                    else:
+                        marks = ['0', '0']
 
                     sheet.cell(row=student_index + 4, column=column).value = marks[0]
                     sheet.cell(row=student_index + 4, column=column + 2).value = marks[1]
