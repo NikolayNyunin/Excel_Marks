@@ -10,7 +10,7 @@ from PyQt5.QtGui import QFont
 
 
 def is_number(mark):
-    if (''.join(mark.split('.'))).isalnum():
+    if (''.join(mark.split('.'))).isdigit():
         return True
     return False
 
@@ -122,7 +122,7 @@ class ExcelMarksInterface(QWidget):
             new_filename = 'Заключение по итоговым оценкам_{}.xlsx'.format(form)
 
             self.analyser.analyse_file(self.filename, form)
-            self.analyser.create_resulting_file(new_filename)
+            self.analyser.create_resulting_file(new_filename, form)
             self.analyser.reset()
 
             self.output_console.append('Успешно обработано: "{}" ({}).'.format(self.filename, form))
@@ -222,12 +222,18 @@ class ExcelMarksAnalyser:
                 if subject not in self.students[short_name].keys():
                     self.students[short_name][subject] = [[None] * 2, [None] * 2, [None] * 2]
 
-                if periods[col] == '1 триместр':  # если это итоговая 1 триместра
-                    self.students[short_name][subject][0][1] = mark
-                elif periods[col] == '2 триместр':  # если это итоговая 2 триместра
-                    self.students[short_name][subject][1][1] = mark
-                elif periods[col] == '3 триместр':  # если это итоговая 3 триместра
-                    self.students[short_name][subject][2][1] = mark
+                if int(form_num) in (10, 11):
+                    if periods[col] == 'Первое полугодие':  # если это итоговая 1 полугодия
+                        self.students[short_name][subject][0][1] = mark
+                    elif periods[col] == 'Второе полугодие':  # если это итоговая 2 полугодия
+                        self.students[short_name][subject][1][1] = mark
+                else:
+                    if periods[col] == '1 триместр':  # если это итоговая 1 триместра
+                        self.students[short_name][subject][0][1] = mark
+                    elif periods[col] == '2 триместр':  # если это итоговая 2 триместра
+                        self.students[short_name][subject][1][1] = mark
+                    elif periods[col] == '3 триместр':  # если это итоговая 3 триместра
+                        self.students[short_name][subject][2][1] = mark
 
             student_index += 1
             student_name = sheet.cell(row=student_index, column=1).value
@@ -252,7 +258,7 @@ class ExcelMarksAnalyser:
         self.get_average_marks(path, filenames)
         self.get_final_marks(filename, form)
 
-    def create_resulting_file(self, filename):  # метод для создания результирующего файла
+    def create_resulting_file(self, filename, form):  # метод для создания результирующего файла
         workbook = Workbook()
         sheet = workbook.active
 
@@ -299,7 +305,13 @@ class ExcelMarksAnalyser:
                     column = subject_column + trimester * 3
 
                     if student_index == 0:  # если это список предметов первого ученика, заполняем шапку
-                        sheet.cell(row=2, column=column).value = '{}-й триместр'.format(trimester + 1)
+                        if int(form.split('-')[0]) in (10, 11):
+                            if trimester == 2:
+                                sheet.cell(row=2, column=column).value = '-'
+                            else:
+                                sheet.cell(row=2, column=column).value = '{}-е полугодие'.format(trimester + 1)
+                        else:
+                            sheet.cell(row=2, column=column).value = '{}-й триместр'.format(trimester + 1)
                         sheet.cell(row=2, column=column).alignment = Alignment(horizontal='center')
                         sheet.merge_cells(start_row=2, start_column=column,
                                           end_row=2, end_column=column + 2)
@@ -331,13 +343,19 @@ class ExcelMarksAnalyser:
                     else:
                         marks = ['0', '0']
 
+                    if is_number(marks[0]):
+                        marks[0] = float(marks[0])
+                    if is_number(marks[1]):
+                        marks[1] = int(marks[1])
                     sheet.cell(row=student_index + 4, column=column).value = marks[0]
                     sheet.cell(row=student_index + 4, column=column + 2).value = marks[1]
 
                     sheet.cell(row=student_index + 4, column=column).alignment = Alignment(horizontal='center')
                     sheet.cell(row=student_index + 4, column=column + 2).alignment = Alignment(horizontal='center')
 
-                    recommended = get_needed_mark(marks[0])
+                    recommended = get_needed_mark(str(marks[0]))
+                    if is_number(recommended):
+                        recommended = int(recommended)
                     sheet.cell(row=student_index + 4, column=column + 1).value = recommended
                     sheet.cell(row=student_index + 4, column=column + 1).alignment = Alignment(horizontal='center')
 
