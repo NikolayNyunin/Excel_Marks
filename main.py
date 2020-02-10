@@ -362,7 +362,8 @@ class ExcelMarksAnalyser:
                     sheet.cell(row=student_index + 4, column=column + 1).alignment = Alignment(horizontal='center')
 
                     if recommended != marks[1]:
-                        wrong_marks.append((student, subject, marks[0], recommended, marks[1]))
+                        wrong_marks.append({'name': student, 'subject': subject, 'period': trimester,
+                                            'average': marks[0], 'recommended': recommended, 'actual': marks[1]})
 
                         sheet.cell(row=student_index + 4, column=column).font = Font(b=True)
                         sheet.cell(row=student_index + 4, column=column + 1).font = Font(b=True)
@@ -409,40 +410,37 @@ class ExcelMarksAnalyser:
         if len(wrong_marks) != 0:
             res_sheet = workbook.create_sheet('Results')
 
-            wrong_marks.sort(key=lambda el: el[1])
+            wrong_marks.sort(key=lambda el: el['subject'])
 
-            res_sheet.cell(row=1, column=1, value='Ученик').alignment = Alignment(horizontal='center')
-            res_sheet.cell(row=1, column=2, value='Предмет').alignment = Alignment(horizontal='center')
-            res_sheet.cell(row=1, column=3, value='Ср. б.').alignment = Alignment(horizontal='center')
-            res_sheet.cell(row=1, column=4, value='Рек.').alignment = Alignment(horizontal='center')
-            res_sheet.cell(row=1, column=5, value='Фактич.').alignment = Alignment(horizontal='center')
-
-            res_sheet.cell(row=1, column=1).font = Font(b=True)
-            res_sheet.cell(row=1, column=2).font = Font(b=True)
-            res_sheet.cell(row=1, column=3).font = Font(b=True)
-            res_sheet.cell(row=1, column=4).font = Font(b=True)
-            res_sheet.cell(row=1, column=5).font = Font(b=True)
-
-            res_sheet.cell(row=1, column=1).border = Border(right=self.DOUBLE, bottom=self.DOUBLE)
-            res_sheet.cell(row=1, column=2).border = Border(right=self.DOUBLE, bottom=self.DOUBLE)
-            res_sheet.cell(row=1, column=3).border = Border(right=self.DOUBLE, bottom=self.DOUBLE)
-            res_sheet.cell(row=1, column=4).border = Border(right=self.DOUBLE, bottom=self.DOUBLE)
-            res_sheet.cell(row=1, column=5).border = Border(right=self.DOUBLE, bottom=self.DOUBLE)
+            col_names = ('Ученик', 'Предмет', 'Период', 'Ср. б.', 'Рек.', 'Фактич.')
+            for col in range(1, 7):
+                res_sheet.cell(row=1, column=col, value=col_names[col - 1]).alignment = Alignment(horizontal='center')
+                res_sheet.cell(row=1, column=col).font = Font(b=True)
+                res_sheet.cell(row=1, column=col).border = Border(right=self.DOUBLE, bottom=self.DOUBLE)
 
             res_sheet.column_dimensions['A'].width = 35
             res_sheet.column_dimensions['B'].width = 25
+            res_sheet.column_dimensions['C'].width = 20
 
+            if int(form.split('-')[0]) in (10, 11):
+                for i in range(len(wrong_marks)):
+                    wrong_marks[i]['period'] = '{}-е полугодие'.format(wrong_marks[i]['period'] + 1)
+            else:
+                for i in range(len(wrong_marks)):
+                    wrong_marks[i]['period'] = '{}-й триместр'.format(wrong_marks[i]['period'] + 1)
+
+            keys = ('name', 'subject', 'period', 'average', 'recommended', 'actual')
+            last = False
             for row in range(1, len(wrong_marks) + 1):
-                res_sheet.cell(row=row + 1, column=1, value=wrong_marks[row - 1][0]).border = Border(right=self.THIN,
-                                                                                                     bottom=self.THIN)
-                res_sheet.cell(row=row + 1, column=2, value=wrong_marks[row - 1][1]).border = Border(right=self.THIN,
-                                                                                                     bottom=self.THIN)
-                res_sheet.cell(row=row + 1, column=3, value=wrong_marks[row - 1][2]).border = Border(right=self.THIN,
-                                                                                                     bottom=self.THIN)
-                res_sheet.cell(row=row + 1, column=4, value=wrong_marks[row - 1][3]).border = Border(right=self.THIN,
-                                                                                                     bottom=self.THIN)
-                res_sheet.cell(row=row + 1, column=5, value=wrong_marks[row - 1][4]).border = Border(right=self.THIN,
-                                                                                                     bottom=self.THIN)
+                if row == len(wrong_marks):
+                    last = True
+                for col in range(1, 7):
+                    if not last:
+                        res_sheet.cell(row=row + 1, column=col, value=wrong_marks[row - 1][keys[col - 1]])\
+                            .border = Border(right=self.THIN)
+                    else:
+                        res_sheet.cell(row=row + 1, column=col, value=wrong_marks[row - 1][keys[col - 1]])\
+                            .border = Border(right=self.THIN, bottom=self.THIN)
 
         workbook.save(filename)
 
