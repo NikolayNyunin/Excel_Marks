@@ -36,7 +36,8 @@ class ExcelMarksInterface(QWidget):
     def __init__(self):
         super().__init__()
         self.needed_file_description, self.select_file_button, self.selected_file_label, self.form_data_description,\
-            self.form_input, self.start_analysing_button, self.output_console = [None] * 7
+            self.form_input, self.start_analysing_button, self.or_label, self.start_analysing_all_button,\
+            self.output_console = [None] * 9
         self.init_ui()
         self.analyser = ExcelMarksAnalyser()
         self.filename = None
@@ -52,9 +53,8 @@ class ExcelMarksInterface(QWidget):
         self.setLayout(grid)
 
         self.needed_file_description = QLabel('Выберите файл с итоговыми оценками:', self)
-        self.needed_file_description.setAlignment(Qt.AlignCenter)
         self.needed_file_description.setFont(QFont('Arial', 13))
-        grid.addWidget(self.needed_file_description, 0, 0, 1, 3)
+        grid.addWidget(self.needed_file_description, 0, 0, 1, 3, alignment=Qt.AlignCenter)
 
         self.select_file_button = QPushButton('Выбрать файл', self)
         self.select_file_button.setFont(QFont('Arial', 12))
@@ -67,29 +67,37 @@ class ExcelMarksInterface(QWidget):
         grid.addWidget(self.selected_file_label, 1, 1, 1, 2)
 
         self.form_data_description = QLabel('Введите полное название класса (разделяя номер и букву дефисом):', self)
-        self.form_data_description.setAlignment(Qt.AlignCenter)
         self.form_data_description.setFont(QFont('Arial', 13))
         self.form_data_description.setFixedWidth(570)
-        grid.addWidget(self.form_data_description, 2, 0, 1, 2)
+        grid.addWidget(self.form_data_description, 2, 0, 1, 2, alignment=Qt.AlignCenter)
 
         self.form_input = QLineEdit('', self)
-        self.form_input.setAlignment(Qt.AlignCenter)
         self.form_input.setFont(QFont('Arial', 14))
         self.form_input.setMaximumWidth(150)
         grid.addWidget(self.form_input, 2, 2, alignment=Qt.AlignRight)
 
-        self.start_analysing_button = QPushButton('Начать', self)
+        self.start_analysing_button = QPushButton('Обработать', self)
         self.start_analysing_button.setFont(QFont('Arial', 13))
         self.start_analysing_button.clicked.connect(self.analyse)
         self.start_analysing_button.setAutoDefault(True)
         self.start_analysing_button.setFixedSize(200, 50)
         grid.addWidget(self.start_analysing_button, 4, 0, 1, 3, alignment=Qt.AlignCenter)
 
+        self.or_label = QLabel('ИЛИ', self)
+        self.or_label.setFont(QFont('Arial', 13))
+        grid.addWidget(self.or_label, 5, 0, 1, 3, alignment=Qt.AlignCenter)
+
+        self.start_analysing_all_button = QPushButton('Обработать все файлы в папке')
+        self.start_analysing_all_button.setFont(QFont('Arial', 13))
+        self.start_analysing_all_button.clicked.connect(self.analyse_all)
+        self.start_analysing_all_button.setFixedSize(300, 50)
+        grid.addWidget(self.start_analysing_all_button, 6, 0, 1, 3, alignment=Qt.AlignCenter)
+
         self.output_console = QTextEdit('', self)
         self.output_console.setFont(QFont('Arial', 12))
         self.output_console.setReadOnly(True)
         self.output_console.setMaximumHeight(300)
-        grid.addWidget(self.output_console, 5, 0, 1, 3)
+        grid.addWidget(self.output_console, 7, 0, 1, 3)
 
     def select_file(self):  # метод для отображения окна выбора файла
         filename = QFileDialog.getOpenFileName(self, 'Выбор файла для обработки')[0]
@@ -99,7 +107,7 @@ class ExcelMarksInterface(QWidget):
             self.filename = filename
             self.selected_file_label.setText('Выбранный файл: "{}".'.format(filename.split('/')[-1]))
 
-    def analyse(self):  # метод для обработки файла
+    def analyse(self, form=None):  # метод для обработки файла
         if self.filename in (None, ''):  # проверка на то, что файл не выбран
             self.output_console.append('Ошибка: Файл не выбран.\n')
             return
@@ -108,7 +116,8 @@ class ExcelMarksInterface(QWidget):
                                        format(self.filename.split('.')[-1]))
             return
 
-        form = self.form_input.text().upper()
+        if not form:
+            form = self.form_input.text().upper()
         if form == '':  # проверка на то, что класс не указан
             self.output_console.append('Ошибка: Класс не указан.\n')
             return
@@ -131,6 +140,25 @@ class ExcelMarksInterface(QWidget):
 
         except Exception as e:
             self.output_console.append('Ошибка: {}.\n'.format(e))
+
+    def analyse_all(self):
+        if self.filename in (None, ''):  # проверка на то, что файл не выбран
+            self.output_console.append('Ошибка: Файл не выбран.\n')
+            return
+        if not self.filename.endswith('.xlsx'):  # проверка на расширение файла
+            self.output_console.append('Ошибка: Неподдерживаемое расширение файла: "{}".\n'.
+                                       format(self.filename.split('.')[-1]))
+            return
+
+        if len(self.filename.split('/')) > 1:
+            path = '/'.join(self.filename.split('/')[:-1]) + '/'
+        else:
+            path = ''
+
+        files = os.listdir(path)
+        forms = []
+        for file in files:
+            file = file.split('-')
 
 
 class ExcelMarksAnalyser:
