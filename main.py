@@ -1,6 +1,6 @@
 import sys
 import os
-from time import time
+import time
 
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -49,7 +49,7 @@ class ExcelMarksInterface(QWidget):
 
         grid = QGridLayout()
         grid.setContentsMargins(40, 20, 40, 30)
-        grid.setSpacing(20)
+        grid.setSpacing(15)
         self.setLayout(grid)
 
         self.needed_file_description = QLabel('Выберите файл с итоговыми оценками:', self)
@@ -126,7 +126,7 @@ class ExcelMarksInterface(QWidget):
             return
 
         try:
-            start_time = time()
+            start_time = time.time()
 
             new_filename = 'Заключение по итоговым оценкам_{}.xlsx'.format(form)
 
@@ -136,7 +136,8 @@ class ExcelMarksInterface(QWidget):
 
             self.output_console.append('Успешно обработано: "{}" ({}).'.format(self.filename, form))
             self.output_console.append('Файл "{}" успешно создан.'.format(new_filename))
-            self.output_console.append('Длительность выполнения: {} сек.\n'.format(str(round(time() - start_time, 2))))
+            self.output_console.append('Длительность выполнения: {} сек.\n'.
+                                       format(str(round(time.time() - start_time, 2))))
 
         except Exception as e:
             self.output_console.append('Ошибка: {}.\n'.format(e))
@@ -159,6 +160,26 @@ class ExcelMarksInterface(QWidget):
         forms = []
         for file in files:
             file = file.split('-')
+            if not file[-1].endswith('.xlsx'):
+                continue
+
+            for i in range(len(file) - 1):
+                if len(file[i]) < 1 or len(file[i + 1]) < 1:
+                    continue
+
+                if file[i + 1][0].isalpha():
+                    if file[i].endswith('10') or file[i].endswith('11'):
+                        forms.append(file[i][-2:] + '-' + file[i + 1][0])
+                        break
+                    elif file[i][-1].isdigit():
+                        forms.append(file[i][-1] + '-' + file[i + 1][0])
+                        break
+
+        for form in forms:
+            self.analyse(form)
+            self.output_console.repaint()
+
+        self.output_console.append('Обработка файлов завершена.\n')
 
 
 class ExcelMarksAnalyser:
