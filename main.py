@@ -151,7 +151,7 @@ class ExcelMarksInterface(QWidget):
             new_filename = 'Заключение по итоговым оценкам_{}.xlsx'.format(form)
 
             self.analyser.analyse_file(self.filename, form, period)
-            self.analyser.create_resulting_file(new_filename, form)  # , period)
+            self.analyser.create_resulting_file(new_filename, form, period)
             self.analyser.reset()
 
             self.output_console.append('Успешно обработано: "{}" ({}).'.format(self.filename, form))
@@ -225,7 +225,7 @@ class ExcelMarksAnalyser:
         self.all_subjects = None
         self.students = {}
 
-    def get_average_marks(self, path, filenames):  # метод для получения средних баллов из первого файла
+    def get_average_marks(self, path, filenames, period):  # метод для получения средних баллов из первого файла
         if len(filenames) == 1:
             file_num = 0
         else:
@@ -255,7 +255,7 @@ class ExcelMarksAnalyser:
                 if subject not in self.students[student].keys():
                     self.students[student][subject] = [[None] * 2, [None] * 2, [None] * 2]
 
-                self.students[student][subject][file_num][0] = mark
+                self.students[student][subject][int(period) - 1][0] = mark
 
             row_num += 1
 
@@ -331,18 +331,15 @@ class ExcelMarksAnalyser:
         filenames = []
         for file in os.listdir(path):
             if form in file and '.xlsx' in file:
-                if 'I' not in file:
-                    filenames.append(file)
-                    break
                 filenames.append(file)
-        filenames.sort(key=lambda el: el.count('I'))
+
         if len(filenames) == 0:
             raise ValueError('Файл со средними оценками не найден')
 
-        self.get_average_marks(path, filenames)
+        self.get_average_marks(path, filenames, period)
         self.get_final_marks(filename, form)
 
-    def create_resulting_file(self, filename, form):  # метод для создания результирующего файла
+    def create_resulting_file(self, filename, form, period):  # метод для создания результирующего файла
         wrong_marks = []
 
         workbook = Workbook()
@@ -424,7 +421,7 @@ class ExcelMarksAnalyser:
                                                                                  top=self.THIN, right=self.DOUBLE)
                             sheet.cell(row=3, column=column + 2).border = Border(bottom=self.THIN, right=self.DOUBLE)
 
-                    if subject in self.students[student].keys():  # если предмета нет в списке предметов ученика
+                    if subject in self.students[student].keys() and trimester == int(period) - 1:
                         marks = ['0' if mark is None else mark for mark in self.students[student][subject][trimester]]
                     else:
                         marks = ['0', '0']
@@ -540,4 +537,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
