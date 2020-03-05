@@ -35,9 +35,9 @@ def get_needed_mark(mark):
 class ExcelMarksInterface(QWidget):
     def __init__(self):
         super().__init__()
-        self.needed_file_description, self.select_file_button, self.selected_file_label, self.form_data_description,\
-            self.form_input, self.start_analysing_button, self.or_label, self.start_analysing_all_button,\
-            self.output_console = [None] * 9
+        self.needed_file_description, self.select_file_button, self.selected_file_label, self.period_label,\
+            self.period_input, self.form_data_description, self.form_input, self.start_analysing_button,\
+            self.or_label, self.start_analysing_all_button, self.output_console = [None] * 11
         self.init_ui()
         self.analyser = ExcelMarksAnalyser()
         self.filename = None
@@ -66,15 +66,23 @@ class ExcelMarksInterface(QWidget):
         self.selected_file_label.setFont(QFont('Arial', 12))
         grid.addWidget(self.selected_file_label, 1, 1, 1, 2)
 
+        self.period_label = QLabel('Номер триместра или полугодия:', self)
+        self.period_label.setFont(QFont('Arial', 12))
+        grid.addWidget(self.period_label, 2, 0, 1, 2, alignment=Qt.AlignCenter)
+
+        self.period_input = QLineEdit('', self)
+        self.period_input.setFont(QFont('Arial', 14))
+        grid.addWidget(self.period_input, 2, 2)
+
         self.form_data_description = QLabel('Введите полное название класса (разделяя номер и букву дефисом):', self)
         self.form_data_description.setFont(QFont('Arial', 13))
         self.form_data_description.setFixedWidth(570)
-        grid.addWidget(self.form_data_description, 2, 0, 1, 2, alignment=Qt.AlignCenter)
+        grid.addWidget(self.form_data_description, 3, 0, 1, 2, alignment=Qt.AlignCenter)
 
         self.form_input = QLineEdit('', self)
         self.form_input.setFont(QFont('Arial', 14))
         self.form_input.setMaximumWidth(150)
-        grid.addWidget(self.form_input, 2, 2, alignment=Qt.AlignRight)
+        grid.addWidget(self.form_input, 3, 2, alignment=Qt.AlignRight)
 
         self.start_analysing_button = QPushButton('Обработать', self)
         self.start_analysing_button.setFont(QFont('Arial', 13))
@@ -107,7 +115,7 @@ class ExcelMarksInterface(QWidget):
             self.filename = filename
             self.selected_file_label.setText('Выбранный файл: "{}".'.format(filename.split('/')[-1]))
 
-    def analyse(self, form=None):  # метод для обработки файла
+    def analyse(self, form=None, period=None):  # метод для обработки файла
         if self.filename in (None, ''):  # проверка на то, что файл не выбран
             self.output_console.append('Ошибка: Файл не выбран.\n')
             return
@@ -125,13 +133,25 @@ class ExcelMarksInterface(QWidget):
             self.output_console.append('Ошибка: Неправильный формат названия класса.\n')
             return
 
+        if not period:
+            period = self.period_input.text()
+        if period == '':
+            self.output_console.append('Ошибка: Период аттестации не указан.\n')
+            return
+        if not period.isdigit():
+            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
+            return
+        if int(period) > 3 or int(period) < 1:
+            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
+            return
+
         try:
             start_time = time.time()
 
             new_filename = 'Заключение по итоговым оценкам_{}.xlsx'.format(form)
 
-            self.analyser.analyse_file(self.filename, form)
-            self.analyser.create_resulting_file(new_filename, form)
+            self.analyser.analyse_file(self.filename, form, period)
+            self.analyser.create_resulting_file(new_filename, form)  # , period)
             self.analyser.reset()
 
             self.output_console.append('Успешно обработано: "{}" ({}).'.format(self.filename, form))
@@ -149,6 +169,17 @@ class ExcelMarksInterface(QWidget):
         if not self.filename.endswith('.xlsx'):  # проверка на расширение файла
             self.output_console.append('Ошибка: Неподдерживаемое расширение файла: "{}".\n'.
                                        format(self.filename.split('.')[-1]))
+            return
+
+        period = self.period_input.text()
+        if period == '':
+            self.output_console.append('Ошибка: Период аттестации не указан.\n')
+            return
+        if not period.isdigit():
+            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
+            return
+        if int(period) > 3 or int(period) < 1:
+            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
             return
 
         if len(self.filename.split('/')) > 1:
@@ -176,7 +207,7 @@ class ExcelMarksInterface(QWidget):
                         break
 
         for form in forms:
-            self.analyse(form)
+            self.analyse(form, period)
             self.output_console.repaint()
 
         self.output_console.append('Обработка файлов завершена.\n')
@@ -195,34 +226,38 @@ class ExcelMarksAnalyser:
         self.students = {}
 
     def get_average_marks(self, path, filenames):  # метод для получения средних баллов из первого файла
-        for file_num in range(len(filenames)):  # пробегаемся по файлам за каждый триместр
-            workbook = load_workbook('{}{}'.format(path, filenames[file_num]), read_only=True)
-            sheet = workbook.active
+        if len(filenames) == 1:
+            file_num = 0
+        else:
+            raise ValueError('Слишком много файлов со средними оценками')
 
-            subjects = list(map(lambda s: s.value, sheet[6][1:]))
-            self.all_subjects = subjects.copy()
+        workbook = load_workbook('{}{}'.format(path, filenames[file_num]), read_only=True)
+        sheet = workbook.active
 
-            row_num = 7
-            while True:  # пробегаемся по всем рядам таблицы с учениками
-                if row_num > sheet.max_row:
-                    break
-                row = list(map(lambda c: c.value, sheet[row_num]))
-                student = row[0]
-                if student in ('', None):  # проверка на пустоту ячейки
-                    break
-                if student not in self.students.keys():
-                    self.students[student] = {}
+        subjects = list(map(lambda s: s.value, sheet[6][1:]))
+        self.all_subjects = subjects.copy()
 
-                for mark_index in range(len(row[1:])):  # пробегаемся по всем оценкам данного ученика
-                    mark = row[1:][mark_index]
-                    subject = subjects[mark_index]
+        row_num = 7
+        while True:  # пробегаемся по всем рядам таблицы с учениками
+            if row_num > sheet.max_row:
+                break
+            row = list(map(lambda c: c.value, sheet[row_num]))
+            student = row[0]
+            if student in ('', None):  # проверка на пустоту ячейки
+                break
+            if student not in self.students.keys():
+                self.students[student] = {}
 
-                    if subject not in self.students[student].keys():
-                        self.students[student][subject] = [[None] * 2, [None] * 2, [None] * 2]
+            for mark_index in range(len(row[1:])):  # пробегаемся по всем оценкам данного ученика
+                mark = row[1:][mark_index]
+                subject = subjects[mark_index]
 
-                    self.students[student][subject][file_num][0] = mark
+                if subject not in self.students[student].keys():
+                    self.students[student][subject] = [[None] * 2, [None] * 2, [None] * 2]
 
-                row_num += 1
+                self.students[student][subject][file_num][0] = mark
+
+            row_num += 1
 
     def get_final_marks(self, filename, form):  # метод для получения триместровых оценок
         workbook = load_workbook(filename, read_only=False)
@@ -287,7 +322,7 @@ class ExcelMarksAnalyser:
             student_index += 1
             student_name = sheet.cell(row=student_index, column=1).value
 
-    def analyse_file(self, filename, form):  # основной метод для обработки данных файлов
+    def analyse_file(self, filename, form, period):  # основной метод для обработки данных файлов
         if len(filename.split('/')) > 1:
             path = '/'.join(filename.split('/')[:-1]) + '/'
         else:
@@ -505,3 +540,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
