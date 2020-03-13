@@ -57,32 +57,32 @@ class ExcelMarksInterface(QWidget):
         grid.addWidget(self.needed_file_description, 0, 0, 1, 3, alignment=Qt.AlignCenter)
 
         self.select_file_button = QPushButton('Выбрать файл', self)
-        self.select_file_button.setFont(QFont('Arial', 12))
+        self.select_file_button.setFont(QFont('Arial', 13))
         self.select_file_button.clicked.connect(self.select_file)
         self.select_file_button.setFixedSize(150, 40)
         grid.addWidget(self.select_file_button, 1, 0, alignment=Qt.AlignCenter)
 
         self.selected_file_label = QLabel('Файл не выбран.', self)
-        self.selected_file_label.setFont(QFont('Arial', 12))
+        self.selected_file_label.setFont(QFont('Arial', 13))
         grid.addWidget(self.selected_file_label, 1, 1, 1, 2)
 
         self.period_label = QLabel('Номер триместра или полугодия:', self)
-        self.period_label.setFont(QFont('Arial', 12))
+        self.period_label.setFont(QFont('Arial', 13))
         grid.addWidget(self.period_label, 2, 0, 1, 2, alignment=Qt.AlignCenter)
 
         self.period_input = QLineEdit('', self)
         self.period_input.setFont(QFont('Arial', 14))
-        grid.addWidget(self.period_input, 2, 2)
+        self.period_input.setMaximumWidth(150)
+        grid.addWidget(self.period_input, 2, 2, alignment=Qt.AlignCenter)
 
-        self.form_data_description = QLabel('Введите полное название класса (разделяя номер и букву дефисом):', self)
+        self.form_data_description = QLabel('Название класса (разделяя номер и букву дефисом):', self)
         self.form_data_description.setFont(QFont('Arial', 13))
-        self.form_data_description.setFixedWidth(570)
         grid.addWidget(self.form_data_description, 3, 0, 1, 2, alignment=Qt.AlignCenter)
 
         self.form_input = QLineEdit('', self)
         self.form_input.setFont(QFont('Arial', 14))
         self.form_input.setMaximumWidth(150)
-        grid.addWidget(self.form_input, 3, 2, alignment=Qt.AlignRight)
+        grid.addWidget(self.form_input, 3, 2, alignment=Qt.AlignCenter)
 
         self.start_analysing_button = QPushButton('Обработать', self)
         self.start_analysing_button.setFont(QFont('Arial', 13))
@@ -142,6 +142,9 @@ class ExcelMarksInterface(QWidget):
             self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
             return
         if int(period) > 3 or int(period) < 1:
+            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
+            return
+        if int(form.split('-')[0]) in (10, 11) and int(period) == 3:
             self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
             return
 
