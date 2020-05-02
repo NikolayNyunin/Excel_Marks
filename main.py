@@ -4,6 +4,7 @@ import time
 
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from PyQt5.QtWidgets import QApplication, QWidget, QFileDialog, QPushButton, QLineEdit, QTextEdit, QLabel, QGridLayout
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
@@ -30,6 +31,24 @@ def get_needed_mark(mark):
     elif mark < 4.5:
         return '4'
     return '5'
+
+
+def classify(marks):
+    if 'Нзч' in marks:
+        return 'Есть незачёты'
+    if '2' in marks:
+        return 'Двоечник'
+    if marks.count('3') == 1:
+        return 'С одной 3'
+    if marks.count('3') > 1:
+        return 'Троечник'
+    if marks.count('4') == 1:
+        return 'С одной 4'
+    if marks.count('4') > 1:
+        return 'Хорошист'
+    if '5' in marks:
+        return 'Отличник'
+    return 'Недостаточно данных'
 
 
 class ExcelMarksInterface(QWidget):
@@ -220,6 +239,7 @@ class ExcelMarksAnalyser:
     def __init__(self):
         self.all_subjects = None
         self.students = {}
+        self.classifications = {}
         self.THIN = Side(border_style='thin', color='000000')
         self.THICK = Side(border_style='thick', color='000000')
         self.DOUBLE = Side(border_style='double', color='000000')
@@ -227,6 +247,7 @@ class ExcelMarksAnalyser:
     def reset(self):
         self.all_subjects = None
         self.students = {}
+        self.classifications = {}
 
     def get_average_marks(self, path, filenames, period):  # метод для получения средних баллов из первого файла
         if len(filenames) == 1:
@@ -325,6 +346,14 @@ class ExcelMarksAnalyser:
             student_index += 1
             student_name = sheet.cell(row=student_index, column=1).value
 
+    def classify_students(self, period):
+        for student in self.students:
+            marks = []
+            for subject in self.students[student]:
+                marks.append(self.students[student][subject][int(period) - 1][1])
+
+            self.classifications[student] = classify(marks)
+
     def analyse_file(self, filename, form, period):  # основной метод для обработки данных файлов
         if len(filename.split('/')) > 1:
             path = '/'.join(filename.split('/')[:-1]) + '/'
@@ -341,6 +370,7 @@ class ExcelMarksAnalyser:
 
         self.get_average_marks(path, filenames, period)
         self.get_final_marks(filename, form)
+        self.classify_students(period)
 
     def create_resulting_file(self, filename, form, period):  # метод для создания результирующего файла
         wrong_marks = []
@@ -488,6 +518,15 @@ class ExcelMarksAnalyser:
                             sheet.cell(row=student_index + 4, column=column + 2).border = Border(right=self.DOUBLE)
 
                 subject_index += 1
+
+            classification_column = 4 + subject_index * 9
+            if student_index == 0:
+                sheet.column_dimensions[get_column_letter(classification_column)].width = 25
+                sheet.cell(row=1, column=classification_column,
+                           value='Оценка успеваемости').alignment = Alignment(horizontal='center')
+
+            sheet.cell(row=student_index + 4, column=classification_column,
+                       value=self.classifications[student]).alignment = Alignment(horizontal='center')
 
             student_index += 1
 
