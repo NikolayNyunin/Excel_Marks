@@ -522,11 +522,23 @@ class ExcelMarksAnalyser:
             classification_column = 4 + subject_index * 9
             if student_index == 0:
                 sheet.column_dimensions[get_column_letter(classification_column)].width = 25
+                sheet.merge_cells(start_row=1, end_row=3,
+                                  start_column=classification_column, end_column=classification_column)
                 sheet.cell(row=1, column=classification_column,
-                           value='Оценка успеваемости').alignment = Alignment(horizontal='center')
+                           value='Оценка успеваемости').alignment = Alignment(horizontal='center', vertical='center')
+                sheet.cell(row=1, column=classification_column).border = Border(left=self.THIN, right=self.THIN)
+                sheet.cell(row=2, column=classification_column).border = Border(left=self.THIN, right=self.THIN)
+                sheet.cell(row=3, column=classification_column).border = Border(left=self.THIN, right=self.THIN,
+                                                                                bottom=self.THIN)
 
             sheet.cell(row=student_index + 4, column=classification_column,
                        value=self.classifications[student]).alignment = Alignment(horizontal='center')
+            if student_index == len(self.students) - 1:
+                sheet.cell(row=student_index + 4, column=classification_column).border = \
+                    Border(left=self.THIN, right=self.THIN, bottom=self.THIN)
+            else:
+                sheet.cell(row=student_index + 4, column=classification_column).border = \
+                    Border(left=self.THIN, right=self.THIN)
 
             student_index += 1
 
