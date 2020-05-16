@@ -34,6 +34,8 @@ def get_needed_mark(mark):
 
 
 def classify(marks):
+    if 'Н/А' in marks:
+        return 'Есть неаттестации'
     if 'Нзч' in marks:
         return 'Есть незачёты'
     if '2' in marks:
