@@ -5,7 +5,8 @@ import time
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from PyQt5.QtWidgets import QApplication, QWidget, QFileDialog, QPushButton, QLineEdit, QTextEdit, QLabel, QGridLayout
+from PyQt5.QtWidgets import QApplication, QWidget, QFileDialog, QPushButton,\
+    QLineEdit, QTextEdit, QLabel, QGridLayout, QComboBox
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
@@ -87,13 +88,13 @@ class ExcelMarksInterface(QWidget):
         self.selected_file_label.setFont(QFont('Arial', 13))
         grid.addWidget(self.selected_file_label, 1, 1, 1, 2)
 
-        self.period_label = QLabel('Номер триместра или полугодия:', self)
+        self.period_label = QLabel('Период аттестации (триместр/полугодие/год):', self)
         self.period_label.setFont(QFont('Arial', 13))
         grid.addWidget(self.period_label, 2, 0, 1, 2, alignment=Qt.AlignCenter)
 
-        self.period_input = QLineEdit('', self)
+        self.period_input = QComboBox(self)
+        self.period_input.addItems(['1', '2', '3', 'Год'])
         self.period_input.setFont(QFont('Arial', 14))
-        self.period_input.setMaximumWidth(150)
         grid.addWidget(self.period_input, 2, 2, alignment=Qt.AlignCenter)
 
         self.form_data_description = QLabel('Название класса (разделяя номер и букву дефисом):', self)
@@ -155,17 +156,8 @@ class ExcelMarksInterface(QWidget):
             return
 
         if not period:
-            period = self.period_input.text()
-        if period == '':
-            self.output_console.append('Ошибка: Период аттестации не указан.\n')
-            return
-        if not period.isdigit():
-            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
-            return
-        if int(period) > 3 or int(period) < 1:
-            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
-            return
-        if int(form.split('-')[0]) in (10, 11) and int(period) == 3:
+            period = self.period_input.currentText()
+        if int(form.split('-')[0]) in (10, 11) and period == '3':
             self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
             return
 
@@ -195,16 +187,7 @@ class ExcelMarksInterface(QWidget):
                                        format(self.filename.split('.')[-1]))
             return
 
-        period = self.period_input.text()
-        if period == '':
-            self.output_console.append('Ошибка: Период аттестации не указан.\n')
-            return
-        if not period.isdigit():
-            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
-            return
-        if int(period) > 3 or int(period) < 1:
-            self.output_console.append('Ошибка: Неправильный формат периода аттестации.\n')
-            return
+        period = self.period_input.currentText()
 
         if len(self.filename.split('/')) > 1:
             path = '/'.join(self.filename.split('/')[:-1]) + '/'
@@ -279,9 +262,12 @@ class ExcelMarksAnalyser:
                 subject = subjects[mark_index]
 
                 if subject not in self.students[student].keys():
-                    self.students[student][subject] = [[None] * 2, [None] * 2, [None] * 2]
+                    self.students[student][subject] = [[None] * 2, [None] * 2, [None] * 2, [None] * 2]
 
-                self.students[student][subject][int(period) - 1][0] = mark
+                if period.isdigit():
+                    self.students[student][subject][int(period) - 1][0] = mark
+                else:
+                    self.students[student][subject][3][0] = mark
 
             row_num += 1
 
@@ -330,7 +316,7 @@ class ExcelMarksAnalyser:
 
                 subject = subjects[col]
                 if subject not in self.students[short_name].keys():
-                    self.students[short_name][subject] = [[None] * 2, [None] * 2, [None] * 2]
+                    self.students[short_name][subject] = [[None] * 2, [None] * 2, [None] * 2, [None] * 2]
 
                 if int(form_num) in (10, 11):
                     if periods[col] == 'Первое полугодие':  # если это итоговая 1 полугодия
@@ -345,6 +331,9 @@ class ExcelMarksAnalyser:
                     elif periods[col] == '3 триместр':  # если это итоговая 3 триместра
                         self.students[short_name][subject][2][1] = mark
 
+                if periods[col] == 'Год':  # если это годовая оценка
+                    self.students[short_name][subject][3][1] = mark
+
             student_index += 1
             student_name = sheet.cell(row=student_index, column=1).value
 
@@ -352,7 +341,10 @@ class ExcelMarksAnalyser:
         for student in self.students:
             marks = []
             for subject in self.students[student]:
-                marks.append(self.students[student][subject][int(period) - 1][1])
+                if period.isdigit():
+                    marks.append(self.students[student][subject][int(period) - 1][1])
+                else:
+                    marks.append(self.students[student][subject][3][1])
 
             self.classifications[student] = classify(marks)
 
@@ -410,118 +402,103 @@ class ExcelMarksAnalyser:
             subject_index = 0
             for subject in sorted(self.all_subjects):  # пробегаемся по всем предметам
 
-                subject_column = 3 + subject_index * 9
+                subject_column = 3 + subject_index * 3
                 if student_index == 0:  # если это список предметов первого ученика, заполняем шапку
                     sheet.cell(row=1, column=subject_column).value = subject
                     sheet.cell(row=1, column=subject_column).alignment = Alignment(horizontal='center')
                     sheet.merge_cells(start_row=1, start_column=subject_column,
-                                      end_row=1, end_column=subject_column + 8)
-                    sheet.cell(row=1, column=subject_column + 8).border = Border(right=self.THICK)
+                                      end_row=1, end_column=subject_column + 2)
+                    sheet.cell(row=1, column=subject_column + 2).border = Border(right=self.THICK)
 
-                for trimester in range(0, 3):  # пробегаемся по триместрам
+                if student_index == 0:  # если это список предметов первого ученика, заполняем шапку
+                    if not period.isdigit():
+                        sheet.cell(row=2, column=subject_column).value = 'Год'
+                    elif int(form.split('-')[0]) in (10, 11):
+                        sheet.cell(row=2, column=subject_column).value = '{}-е полугодие'.format(period)
+                    else:
+                        sheet.cell(row=2, column=subject_column).value = '{}-й триместр'.format(period)
 
-                    column = subject_column + trimester * 3
-
-                    if student_index == 0:  # если это список предметов первого ученика, заполняем шапку
-                        if int(form.split('-')[0]) in (10, 11):
-                            if trimester == 2:
-                                sheet.cell(row=2, column=column).value = '-'
-                            else:
-                                sheet.cell(row=2, column=column).value = '{}-е полугодие'.format(trimester + 1)
-                        else:
-                            sheet.cell(row=2, column=column).value = '{}-й триместр'.format(trimester + 1)
-                        sheet.cell(row=2, column=column).alignment = Alignment(horizontal='center')
-                        sheet.merge_cells(start_row=2, start_column=column,
-                                          end_row=2, end_column=column + 2)
-                        sheet.cell(row=2, column=column).border = Border(top=self.THIN, bottom=self.THIN)
-                        sheet.cell(row=2, column=column + 1).border = Border(top=self.THIN, bottom=self.THIN)
-
-                        sheet.cell(row=3, column=column).value = 'ср. б.'
-                        sheet.cell(row=3, column=column + 1).value = 'рек.'
-                        sheet.cell(row=3, column=column + 2).value = 'фактич.'
-
-                        sheet.cell(row=3, column=column).alignment = Alignment(horizontal='center')
-                        sheet.cell(row=3, column=column + 1).alignment = Alignment(horizontal='center')
-                        sheet.cell(row=3, column=column + 2).alignment = Alignment(horizontal='center')
-
-                        sheet.cell(row=3, column=column).border = Border(bottom=self.THIN, right=self.THIN)
-                        sheet.cell(row=3, column=column + 1).border = Border(bottom=self.THIN, right=self.THIN)
-
-                        if trimester == 2:
-                            sheet.cell(row=2, column=column + 2).border = Border(bottom=self.THIN,
+                    sheet.cell(row=2, column=subject_column).alignment = Alignment(horizontal='center')
+                    sheet.merge_cells(start_row=2, start_column=subject_column,
+                                      end_row=2, end_column=subject_column + 2)
+                    sheet.cell(row=2, column=subject_column).border = Border(top=self.THIN, bottom=self.THIN)
+                    sheet.cell(row=2, column=subject_column + 1).border = Border(top=self.THIN, bottom=self.THIN)
+                    sheet.cell(row=2, column=subject_column + 2).border = Border(bottom=self.THIN,
                                                                                  top=self.THIN, right=self.THICK)
-                            sheet.cell(row=3, column=column + 2).border = Border(bottom=self.THIN, right=self.THICK)
-                        else:
-                            sheet.cell(row=2, column=column + 2).border = Border(bottom=self.THIN,
-                                                                                 top=self.THIN, right=self.DOUBLE)
-                            sheet.cell(row=3, column=column + 2).border = Border(bottom=self.THIN, right=self.DOUBLE)
 
-                    if subject in self.students[student].keys() and trimester == int(period) - 1:
-                        marks = ['0' if mark is None else mark for mark in self.students[student][subject][trimester]]
+                    sheet.cell(row=3, column=subject_column).value = 'ср. б.'
+                    sheet.cell(row=3, column=subject_column + 1).value = 'рек.'
+                    sheet.cell(row=3, column=subject_column + 2).value = 'фактич.'
+
+                    sheet.cell(row=3, column=subject_column).alignment = Alignment(horizontal='center')
+                    sheet.cell(row=3, column=subject_column + 1).alignment = Alignment(horizontal='center')
+                    sheet.cell(row=3, column=subject_column + 2).alignment = Alignment(horizontal='center')
+
+                    sheet.cell(row=3, column=subject_column).border = Border(bottom=self.THIN, right=self.THIN)
+                    sheet.cell(row=3, column=subject_column + 1).border = Border(bottom=self.THIN, right=self.THIN)
+                    sheet.cell(row=3, column=subject_column + 2).border = Border(bottom=self.THIN, right=self.THICK)
+
+                if subject in self.students[student].keys():
+                    if period.isdigit():
+                        marks = ['0' if mark is None else mark for mark in
+                                 self.students[student][subject][int(period) - 1]]
                     else:
-                        marks = ['0', '0']
+                        marks = ['0' if mark is None else mark for mark in self.students[student][subject][3]]
+                else:
+                    marks = ['0', '0']
 
-                    if is_number(marks[0]):
-                        marks[0] = float(marks[0])
-                    if is_number(marks[1]):
-                        marks[1] = int(marks[1])
-                    sheet.cell(row=student_index + 4, column=column).value = marks[0]
-                    sheet.cell(row=student_index + 4, column=column + 2).value = marks[1]
+                if is_number(marks[0]):
+                    marks[0] = float(marks[0])
+                if is_number(marks[1]):
+                    marks[1] = int(marks[1])
+                sheet.cell(row=student_index + 4, column=subject_column).value = marks[0]
+                sheet.cell(row=student_index + 4, column=subject_column + 2).value = marks[1]
 
-                    sheet.cell(row=student_index + 4, column=column).alignment = Alignment(horizontal='center')
-                    sheet.cell(row=student_index + 4, column=column + 2).alignment = Alignment(horizontal='center')
+                sheet.cell(row=student_index + 4, column=subject_column).alignment = Alignment(horizontal='center')
+                sheet.cell(row=student_index + 4, column=subject_column + 2).alignment = Alignment(horizontal='center')
 
-                    recommended = get_needed_mark(str(marks[0]))
-                    if is_number(recommended):
-                        recommended = int(recommended)
-                    sheet.cell(row=student_index + 4, column=column + 1).value = recommended
-                    sheet.cell(row=student_index + 4, column=column + 1).alignment = Alignment(horizontal='center')
+                recommended = get_needed_mark(str(marks[0]))
+                if is_number(recommended):
+                    recommended = int(recommended)
+                sheet.cell(row=student_index + 4, column=subject_column + 1).value = recommended
+                sheet.cell(row=student_index + 4, column=subject_column + 1).alignment = Alignment(horizontal='center')
 
-                    if recommended != marks[1]:
-                        wrong_marks.append({'name': student, 'subject': subject, 'period': trimester,
-                                            'average': marks[0], 'recommended': recommended, 'actual': marks[1]})
+                if recommended != marks[1]:
+                    wrong_marks.append({'name': student, 'subject': subject, 'period': period,
+                                        'average': marks[0], 'recommended': recommended, 'actual': marks[1]})
 
-                        sheet.cell(row=student_index + 4, column=column).font = Font(b=True)
-                        sheet.cell(row=student_index + 4, column=column + 1).font = Font(b=True)
-                        sheet.cell(row=student_index + 4, column=column + 2).font = Font(b=True)
-                        sheet.cell(row=student_index + 4, column=column).fill = PatternFill(
-                            start_color='FF4040',
-                            end_color='FF4040',
-                            fill_type='solid')
-                        sheet.cell(row=student_index + 4, column=column + 1).fill = PatternFill(
-                            start_color='FF4040',
-                            end_color='FF4040',
-                            fill_type='solid')
-                        sheet.cell(row=student_index + 4, column=column + 2).fill = PatternFill(
-                            start_color='FF4040',
-                            end_color='FF4040',
-                            fill_type='solid')
+                    sheet.cell(row=student_index + 4, column=subject_column).font = Font(b=True)
+                    sheet.cell(row=student_index + 4, column=subject_column + 1).font = Font(b=True)
+                    sheet.cell(row=student_index + 4, column=subject_column + 2).font = Font(b=True)
+                    sheet.cell(row=student_index + 4, column=subject_column).fill = PatternFill(
+                        start_color='FF4040',
+                        end_color='FF4040',
+                        fill_type='solid')
+                    sheet.cell(row=student_index + 4, column=subject_column + 1).fill = PatternFill(
+                        start_color='FF4040',
+                        end_color='FF4040',
+                        fill_type='solid')
+                    sheet.cell(row=student_index + 4, column=subject_column + 2).fill = PatternFill(
+                        start_color='FF4040',
+                        end_color='FF4040',
+                        fill_type='solid')
 
-                    if student_index == len(self.students) - 1:  # если это последний ученик в списке,
-                        # рисуем нижнюю границу
-                        sheet.cell(row=student_index + 4, column=column).border = Border(bottom=self.THIN,
-                                                                                         right=self.THIN)
-                        sheet.cell(row=student_index + 4, column=column + 1).border = Border(bottom=self.THIN,
+                if student_index == len(self.students) - 1:  # если это последний ученик в списке,
+                    # рисуем нижнюю границу
+                    sheet.cell(row=student_index + 4, column=subject_column).border = Border(bottom=self.THIN,
                                                                                              right=self.THIN)
-
-                        if trimester == 2:
-                            sheet.cell(row=student_index + 4, column=column + 2).border = Border(bottom=self.THIN,
+                    sheet.cell(row=student_index + 4, column=subject_column + 1).border = Border(bottom=self.THIN,
+                                                                                                 right=self.THIN)
+                    sheet.cell(row=student_index + 4, column=subject_column + 2).border = Border(bottom=self.THIN,
                                                                                                  right=self.THICK)
-                        else:
-                            sheet.cell(row=student_index + 4, column=column + 2).border = Border(bottom=self.THIN,
-                                                                                                 right=self.DOUBLE)
-                    else:
-                        sheet.cell(row=student_index + 4, column=column).border = Border(right=self.THIN)
-                        sheet.cell(row=student_index + 4, column=column + 1).border = Border(right=self.THIN)
-
-                        if trimester == 2:
-                            sheet.cell(row=student_index + 4, column=column + 2).border = Border(right=self.THICK)
-                        else:
-                            sheet.cell(row=student_index + 4, column=column + 2).border = Border(right=self.DOUBLE)
+                else:
+                    sheet.cell(row=student_index + 4, column=subject_column).border = Border(right=self.THIN)
+                    sheet.cell(row=student_index + 4, column=subject_column + 1).border = Border(right=self.THIN)
+                    sheet.cell(row=student_index + 4, column=subject_column + 2).border = Border(right=self.THICK)
 
                 subject_index += 1
 
-            classification_column = 4 + subject_index * 9
+            classification_column = 4 + subject_index * 3
             if student_index == 0:
                 sheet.column_dimensions[get_column_letter(classification_column)].width = 25
                 sheet.merge_cells(start_row=1, end_row=3,
@@ -559,12 +536,15 @@ class ExcelMarksAnalyser:
             res_sheet.column_dimensions['B'].width = 25
             res_sheet.column_dimensions['C'].width = 20
 
-            if int(form.split('-')[0]) in (10, 11):
+            if not period.isdigit():
                 for i in range(len(wrong_marks)):
-                    wrong_marks[i]['period'] = '{}-е полугодие'.format(wrong_marks[i]['period'] + 1)
+                    wrong_marks[i]['period'] = 'Год'
+            elif int(form.split('-')[0]) in (10, 11):
+                for i in range(len(wrong_marks)):
+                    wrong_marks[i]['period'] = '{}-е полугодие'.format(wrong_marks[i]['period'])
             else:
                 for i in range(len(wrong_marks)):
-                    wrong_marks[i]['period'] = '{}-й триместр'.format(wrong_marks[i]['period'] + 1)
+                    wrong_marks[i]['period'] = '{}-й триместр'.format(wrong_marks[i]['period'])
 
             keys = ('name', 'subject', 'period', 'average', 'recommended', 'actual')
             last = False
